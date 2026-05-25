@@ -36,15 +36,17 @@ Virtual Display Driver は **400×240 を出せません**（ドライバの最�
 
 ### 配信（仮想モニター → 3DS）
 
-```powershell
-start-cast-vdd.bat <3DSのIP>
-```
-
-または `cast-config.json` を作成（`cast-config.json.example` を参照）:
+`cast.bat` / `cast-config.json`（`vdd: true`）使用時、**キャスト中だけ**仮想ディスプレイを有効化します（終了時に自動で無効化）。初回は **管理者 (UAC)** の承認が必要です。消えないときは `scripts\vdd-off.bat` を実行してください。手動で常時表示したい場合は `vdd_auto: false` を設定してください。
 
 ```powershell
 copy cast-config.json.example cast-config.json
-python scripts/pc-cast.py --vdd
+cast.bat
+```
+
+または IP 指定:
+
+```powershell
+start-cast-vdd.bat <3DSのIP>
 ```
 
 ## 使い方（基本）
@@ -79,6 +81,7 @@ python scripts/pc-cast.py --host 192.168.1.42
 | `--fps 25` | 送信フレームレート（既定 25、`0` で上限なし） |
 | （既定） | **拡張ディスプレイ**（非プライマリ）を自動選択 |
 | `--vdd` | **仮想モニター**をキャプチャ（Windows に 3DS 用デスクトップ） |
+| `--vdd-auto` / `--no-vdd-auto` | キャスト中のみ VDD を有効化（既定: 有効） |
 | `--primary` | メイン画面をキャプチャ（複製モード向け） |
 | `--monitor 2` | mss のモニター番号を指定 |
 | `--list-monitors` | 接続中のモニター一覧を表示 |
@@ -180,7 +183,8 @@ APP_UNIQUE_ID = 0xDMIR3D
 DeskMirror/
 ├── source/main.cpp      # 3DS 受信・表示
 ├── scripts/pc-cast.py   # PC 送信
-├── start-cast.bat       # PC 送信の簡易起動
+├── cast.bat             # cast-config.json で PC 送信（推奨）
+├── start-cast.bat       # IP 指定で PC 送信
 ├── resources/           # AppInfo, アイコン, RSF
 └── output/              # ビルド成果物
 ```

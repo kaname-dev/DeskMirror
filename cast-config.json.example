@@ -1,6 +1,7 @@
 {
   "host": "192.168.2.101",
   "vdd": true,
+  "vdd_auto": true,
   "fps": 15,
   "monitor_keyword": "Virtual"
 }

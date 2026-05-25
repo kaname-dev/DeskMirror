@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo ========================================
-echo  3DS FBI Remote Install - Web UI
+echo  DeskMirror - FBI Web UI
 echo ========================================
 echo.
 
@@ -11,10 +11,10 @@ where python >nul 2>&1
 if errorlevel 1 (
     where py >nul 2>&1
     if errorlevel 1 (
-        echo [ERROR] Python 3 が見つかりません。
-        echo https://www.python.org/downloads/ からインストールしてください。
+        echo [ERROR] Python 3 not found.
+        echo Install from https://www.python.org/downloads/
         set EXITCODE=1
-        goto :end
+        goto end
     )
 )
 
@@ -23,7 +23,7 @@ set EXITCODE=%ERRORLEVEL%
 
 if not %EXITCODE%==0 (
     echo.
-    echo [ERROR] サーバー起動に失敗しました (code %EXITCODE%)
+    echo [ERROR] Server failed to start (exit code %EXITCODE%)
 )
 
 :end

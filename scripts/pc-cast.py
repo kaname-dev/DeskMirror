@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import socket
 import struct
@@ -189,6 +190,56 @@ def send_frame(sock: socket.socket, payload: bytes) -> None:
     sock.sendall(payload)
 
 
+class VddRuntime:
+    """Enable VDD on cast start, disable on exit (Windows only)."""
+
+    def __init__(self, enabled: bool, monitor_keyword: str | None) -> None:
+        self.enabled = enabled
+        self.monitor_keyword = monitor_keyword
+        self._active = False
+
+    def start(self) -> bool:
+        if not self.enabled or sys.platform != "win32":
+            return True
+        from win_vdd import VddError, disable, enable, wait_for_virtual_monitor
+
+        try:
+            print("Enabling virtual display (VDD)...")
+            print("Approve the Administrator (UAC) prompt if shown.")
+            enable()
+            self._active = True
+            atexit.register(self.stop)
+        except VddError as exc:
+            print(f"Warning: could not enable VDD: {exc}", file=sys.stderr)
+            print("Run cast.bat again and approve UAC, or use --no-vdd-auto.", file=sys.stderr)
+            return False
+
+        idx = wait_for_virtual_monitor(self.monitor_keyword, timeout=30.0)
+        if idx is None:
+            print(
+                "Warning: virtual monitor not detected after enable. "
+                "Check VDD / display settings.",
+                file=sys.stderr,
+            )
+            return False
+        print(f"Virtual display ready (mss #{idx}).")
+        return True
+
+    def stop(self) -> None:
+        if not self._active:
+            return
+        self._active = False
+        from win_vdd import VddError, disable
+
+        try:
+            print("Disabling virtual display (VDD)...")
+            print("Approve the Administrator (UAC) prompt if shown.")
+            disable()
+        except VddError as exc:
+            print(f"Warning: could not disable VDD: {exc}", file=sys.stderr)
+            print("Run scripts\\vdd-off.bat manually to remove the virtual display.", file=sys.stderr)
+
+
 def connect(host: str, port: int) -> socket.socket:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -231,6 +282,19 @@ def main() -> int:
         default=cfg.get("monitor_keyword"),
         help="Substring match for monitor name (with --vdd)",
     )
+    vdd_auto_default = bool(cfg.get("vdd_auto", True))
+    parser.add_argument(
+        "--vdd-auto",
+        action="store_true",
+        default=vdd_auto_default,
+        help="Enable virtual display only while casting (Windows VDD pipe)",
+    )
+    parser.add_argument(
+        "--no-vdd-auto",
+        action="store_false",
+        dest="vdd_auto",
+        help="Do not toggle VDD; keep virtual display as configured",
+    )
     parser.add_argument("--list-monitors", action="store_true")
     parser.add_argument(
         "--no-cursor",
@@ -247,72 +311,79 @@ def main() -> int:
     if not args.host:
         parser.error("--host is required (3DS IP shown on the bottom screen)")
 
-    with mss.mss() as sct:
-        monitor_index = resolve_monitor_index(
-            sct,
-            args.monitor,
-            args.primary,
-            args.vdd,
-            args.monitor_name,
-        )
-        mode = "virtual monitor" if args.vdd else ("primary" if args.primary else "extended")
-        print(f"Capture ({mode}): {describe_monitor(sct.monitors, monitor_index)}")
+    vdd_runtime = VddRuntime(args.vdd and args.vdd_auto, args.monitor_name)
+    try:
+        if args.vdd and args.vdd_auto:
+            vdd_runtime.start()
 
-    uncapped = args.fps <= 0
-    interval = 0.0 if uncapped else (1.0 / args.fps)
-    if uncapped:
-        print("FPS: uncapped (400x240 full quality)")
-    else:
-        print(f"FPS target: {args.fps:g} (400x240 full quality)")
-    sent = 0
-    t0 = time.perf_counter()
+        with mss.mss() as sct:
+            monitor_index = resolve_monitor_index(
+                sct,
+                args.monitor,
+                args.primary,
+                args.vdd,
+                args.monitor_name,
+            )
+            mode = "virtual monitor" if args.vdd else ("primary" if args.primary else "extended")
+            print(f"Capture ({mode}): {describe_monitor(sct.monitors, monitor_index)}")
 
-    while True:
-        try:
-            sock = connect(args.host, args.port)
-        except OSError as e:
-            print(f"Connection failed: {e}")
-            print("Retrying in 2s ... (check 3DS app is running)")
-            time.sleep(2)
-            continue
+        uncapped = args.fps <= 0
+        interval = 0.0 if uncapped else (1.0 / args.fps)
+        if uncapped:
+            print("FPS: uncapped (400x240 full quality)")
+        else:
+            print(f"FPS target: {args.fps:g} (400x240 full quality)")
+        sent = 0
+        t0 = time.perf_counter()
 
-        try:
-            with mss.mss() as sct:
-                monitor_index = resolve_monitor_index(
-                    sct,
-                    args.monitor,
-                    args.primary,
-                    args.vdd,
-                    args.monitor_name,
-                )
-                while True:
-                    loop_start = time.perf_counter()
-                    img, payload = capture_monitor(
-                        sct, monitor_index, show_cursor=not args.no_cursor
+        while True:
+            try:
+                sock = connect(args.host, args.port)
+            except OSError as e:
+                print(f"Connection failed: {e}")
+                print("Retrying in 2s ... (check 3DS app is running)")
+                time.sleep(2)
+                continue
+
+            try:
+                with mss.mss() as sct:
+                    monitor_index = resolve_monitor_index(
+                        sct,
+                        args.monitor,
+                        args.primary,
+                        args.vdd,
+                        args.monitor_name,
                     )
-                    if payload is None:
-                        payload = frame_to_rgb565(img, _FRAME_BUFFER)
-                    send_frame(sock, payload)
-                    sent += 1
+                    while True:
+                        loop_start = time.perf_counter()
+                        img, payload = capture_monitor(
+                            sct, monitor_index, show_cursor=not args.no_cursor
+                        )
+                        if payload is None:
+                            payload = frame_to_rgb565(img, _FRAME_BUFFER)
+                        send_frame(sock, payload)
+                        sent += 1
 
-                    elapsed = time.perf_counter() - t0
-                    if elapsed >= 1.0:
-                        print(f"\r{sent} fps", end="", flush=True)
-                        sent = 0
-                        t0 = time.perf_counter()
+                        elapsed = time.perf_counter() - t0
+                        if elapsed >= 1.0:
+                            print(f"\r{sent} fps", end="", flush=True)
+                            sent = 0
+                            t0 = time.perf_counter()
 
-                    spent = time.perf_counter() - loop_start
-                    sleep_for = interval - spent
-                    if sleep_for > 0:
-                        time.sleep(sleep_for)
-        except KeyboardInterrupt:
-            print("\nStopped.")
-            return 0
-        except OSError as e:
-            print(f"\nDisconnected: {e}")
-            sock.close()
-            print("Reconnecting in 2s ...")
-            time.sleep(2)
+                        spent = time.perf_counter() - loop_start
+                        sleep_for = interval - spent
+                        if sleep_for > 0:
+                            time.sleep(sleep_for)
+            except KeyboardInterrupt:
+                print("\nStopped.")
+                return 0
+            except OSError as e:
+                print(f"\nDisconnected: {e}")
+                sock.close()
+                print("Reconnecting in 2s ...")
+                time.sleep(2)
+    finally:
+        vdd_runtime.stop()
 
 
 if __name__ == "__main__":

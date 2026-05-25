@@ -18,6 +18,7 @@ if (-not (Test-Path $DstDir)) {
 Copy-Item -Path $SrcXml -Destination $DstXml -Force
 Write-Host "[OK] Copied vdd_settings.xml -> $DstXml" -ForegroundColor Green
 Write-Host ""
+Write-Host "Note: monitor count defaults to 0 (hidden until DeskMirror cast starts)." -ForegroundColor Cyan
 Write-Host "Note: VDD cannot expose 400x240 (driver minimum is 640x480)." -ForegroundColor Yellow
 Write-Host "      Use 800x480 on the virtual monitor (same 5:3 as 3DS 400x240)." -ForegroundColor Yellow
 Write-Host ""

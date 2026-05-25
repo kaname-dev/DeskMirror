@@ -4,7 +4,8 @@
      800x480 matches 3DS aspect ratio (5:3); pc-cast scales to 400x240. -->
 <vdd_settings>
     <monitors>
-        <count>1</count>
+        <!-- 0 = hidden until DeskMirror cast starts (pc-cast enables via pipe) -->
+        <count>0</count>
     </monitors>
     <gpu>
         <friendlyname>default</friendlyname>
