@@ -200,9 +200,15 @@ APP_VERSION_MINOR := $(shell echo $(APP_VERSION_MINOR) | cut -c1-3)
 APP_VERSION_MICRO := $(shell echo $(APP_VERSION_MICRO) | cut -c1-3)
 APP_ROMFS         := $(TOPDIR)/$(ROMFS)
 
-ifneq ("$(wildcard $(TOPDIR)/$(BANNER_IMAGE).cgfx)","")
-	BANNER_IMAGE_FILE := $(TOPDIR)/$(BANNER_IMAGE).cgfx
+# 3D CGFX banners can freeze some consoles; use BANNER_3D=1 to enable.
+ifeq ($(BANNER_3D),1)
+ ifneq ("$(wildcard $(RESOURCES)/banner.cgfx)","")
+	BANNER_IMAGE_FILE := $(TOPDIR)/$(RESOURCES)/banner.cgfx
 	BANNER_IMAGE_ARG  := -ci $(BANNER_IMAGE_FILE)
+ else
+	BANNER_IMAGE_FILE := $(TOPDIR)/$(BANNER_IMAGE).png
+	BANNER_IMAGE_ARG  := -i $(BANNER_IMAGE_FILE)
+ endif
 else
 	BANNER_IMAGE_FILE := $(TOPDIR)/$(BANNER_IMAGE).png
 	BANNER_IMAGE_ARG  := -i $(BANNER_IMAGE_FILE)

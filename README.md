@@ -95,6 +95,8 @@ python scripts/pc-cast.py --host 192.168.1.42
 |--------|------|
 | **START** | 終了 |
 
+待機中の上画面は **3DS MONITOR** の立体スプラッシュです。**3Dスライダーを上げると**立体表示されます（配信中の PC 画面は 2D）。HOME の CIA バナーは安定のため **2D**（`banner.png`）を使用しています。
+
 ## 技術仕様
 
 | 項目 | 値 |
@@ -136,7 +138,7 @@ python scripts/pc-cast.py --host 192.168.1.42
 アイコン生成（任意・ビルド前）:
 
 ```powershell
-python scripts/generate_icon.py
+python scripts/generate_assets.py
 ```
 
 ## 実機へのインストール
@@ -165,7 +167,11 @@ APP_UNIQUE_ID = 0xDMIR3D
 
 **重要:** [3dsdb](https://www.3dsdb.com/) 等で未使用の `APP_UNIQUE_ID` / `APP_PRODUCT_CODE` を使ってください。
 
-バナー・アイコン: `resources/banner.png`, `resources/icon.png`, `resources/audio.wav`
+バナー・アイコン: `python scripts/generate_assets.py` で再生成
+
+- **バナー** (`resources/banner.png`): HOME メニュー・起動時（2D、安定）
+- **3D バナー** (`banner.cgfx`): 実験的。一部の本体でフリーズするため既定では無効（`BANNER_3D=1 make cia`）
+- **アイコン** (`resources/icon.png`): HOME 下画面の 48×48
 
 ## トラブルシューティング
 

@@ -11,6 +11,8 @@
 #include <cstring>
 #include <setjmp.h>
 
+#include "splash_3d.h"
+
 #define SOC_ALIGN 0x1000
 #define SOC_BUFFERSIZE 0x100000
 
@@ -61,9 +63,11 @@ static void hang(const char* message) {
             longjmp(exitJmp, 1);
         if (down & KEY_Y)
             return;
+        drawSplash3D();
         gfxFlushBuffers();
         gspWaitForVBlank();
-        gfxSwapBuffers();
+        gfxScreenSwapBuffers(GFX_TOP, true);
+        gfxScreenSwapBuffers(GFX_BOTTOM, false);
     }
 }
 
@@ -82,7 +86,8 @@ static bool waitForWifi(void) {
         drawStatus("Connecting Wi-Fi...", "Enable wireless in", "System Settings");
         gfxFlushBuffers();
         gspWaitForVBlank();
-        gfxSwapBuffers();
+        gfxScreenSwapBuffers(GFX_TOP, true);
+        gfxScreenSwapBuffers(GFX_BOTTOM, false);
         svcSleepThread(200000000ULL);
     }
     lastNetResult = -2;
@@ -117,6 +122,7 @@ static void formatIp(u32 addr, char* out, size_t outLen) {
 }
 
 static void drawStatus(const char* line1, const char* line2, const char* line3) {
+    drawSplash3D();
     consoleClear();
     printf("\x1b[1;1H  DeskMirror\n");
     printf("\x1b[3;1H  %s\n", line1);
@@ -239,6 +245,8 @@ int main(int argc, char** argv) {
 
     acInit();
     gfxInitDefault();
+    gfxSet3D(true);
+    drawSplash3D();
     consoleInit(GFX_BOTTOM, nullptr);
     gfxSetDoubleBuffering(GFX_TOP, true);
     gfxSetDoubleBuffering(GFX_BOTTOM, false);
@@ -283,6 +291,7 @@ int main(int argc, char** argv) {
 
     drawStatus(status, "Waiting for PC...", nullptr);
     gfxFlushBuffers();
+    gfxScreenSwapBuffers(GFX_TOP, true);
     gfxScreenSwapBuffers(GFX_BOTTOM, false);
 
     while (aptMainLoop()) {
@@ -292,6 +301,9 @@ int main(int argc, char** argv) {
 
         int clientSock = acceptClient(listenSock);
         if (clientSock < 0) {
+            drawSplash3D();
+            gfxFlushBuffers();
+            gfxScreenSwapBuffers(GFX_TOP, true);
             svcSleepThread(50000000ULL);
             continue;
         }
@@ -313,6 +325,7 @@ int main(int argc, char** argv) {
             if (!receiveFrame(clientSock, &frameCount)) {
                 drawStatus(status, "Connection lost", "Waiting for PC...");
                 gfxFlushBuffers();
+                gfxScreenSwapBuffers(GFX_TOP, true);
                 gfxScreenSwapBuffers(GFX_BOTTOM, false);
                 svcSleepThread(500000000ULL);
                 break;
@@ -331,7 +344,7 @@ int main(int argc, char** argv) {
                 }
             }
 
-            /* Swap top screen only — avoids bottom console flicker. */
+            /* Flat 2D stream on top; bottom console unchanged. */
             gfxFlushBuffers();
             gfxScreenSwapBuffers(GFX_TOP, false);
         }
