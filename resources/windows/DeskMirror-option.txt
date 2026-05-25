@@ -1,0 +1,11 @@
+# Legacy IddSampleDriver option.txt (older VDD installs only).
+# Current Virtual Display Driver uses: C:\VirtualDisplayDriver\vdd_settings.xml
+# Run: .\scripts\apply-vdd-resolution.ps1
+#
+# 400x240 is NOT supported by VDD (minimum 640x480).
+# Use 800x480 virtual monitor -> DeskMirror scales to 3DS 400x240.
+
+MONITOR_COUNT=1
+MONITOR_0_WIDTH=800
+MONITOR_0_HEIGHT=480
+MONITOR_0_REFRESH=60

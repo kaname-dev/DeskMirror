@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3DS FBI Remote Install</title>
+  <script src="/static/qrcode.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e7ecf3;
+      --muted: #9aa7b8;
+      --accent: #3d8bfd;
+      --ok: #3ddc84;
+      --err: #ff6b6b;
+      --border: #2a3648;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f7fb;
+        --panel: #ffffff;
+        --text: #1b2430;
+        --muted: #5b677a;
+        --border: #d8e0ea;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.6rem; }
+    h2 { margin: 0 0 12px; font-size: 1rem; }
+    .sub { color: var(--muted); margin-bottom: 16px; }
+    .section-title {
+      margin: 28px 0 12px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .file-card .qr-wrap {
+      margin: 0 0 12px;
+    }
+    .url {
+      font-family: Consolas, monospace;
+      font-size: 0.85rem;
+      word-break: break-all;
+      color: var(--accent);
+      margin: 8px 0;
+    }
+    .qr-wrap {
+      display: flex;
+      justify-content: center;
+      min-height: 200px;
+      align-items: center;
+    }
+    .qr-wrap img {
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px;
+      width: 220px;
+      height: 220px;
+    }
+    label { display: block; margin-bottom: 6px; font-weight: 600; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font-size: 1rem;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+    }
+    button.secondary { background: #4b5563; }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      min-height: 48px;
+    }
+    .status.ok { border-color: var(--ok); }
+    .status.err { border-color: var(--err); }
+    .file-meta { color: var(--muted); font-size: 0.85rem; }
+    ol.steps { margin: 0; padding-left: 20px; color: var(--muted); }
+    .meta-line { color: var(--muted); font-size: 0.85rem; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>3DS FBI 遠隔インストール</h1>
+    <p class="sub">配信ファイルの QR を 3DS / FBI で読み取るか、下のフォームから送信できます。</p>
+
+    <h2>配信ファイル</h2>
+    <div class="grid" id="file-list"></div>
+
+    <div class="status" id="status">準備中...</div>
+
+    <p class="section-title">操作</p>
+    <div class="grid">
+      <section class="card">
+        <h2>FBI へ送信</h2>
+        <ol class="steps">
+          <li>3DS で FBI → Remote Install を開く</li>
+          <li>3DS の IP を入力して送信</li>
+        </ol>
+        <label for="ds-ip">3DS IP アドレス</label>
+        <input id="ds-ip" type="text" placeholder="例: 192.168.1.23" autocomplete="off">
+        <div class="actions">
+          <button id="btn-send">FBI へ送信</button>
+          <button id="btn-build" class="secondary">ビルド (make cia)</button>
+          <button id="btn-refresh" class="secondary">更新</button>
+        </div>
+      </section>
+    </div>
+
+    <p class="meta-line">Web UI: <span id="web-ui-url">-</span></p>
+  </main>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const fileListEl = document.getElementById("file-list");
+    const webUiUrlEl = document.getElementById("web-ui-url");
+    const dsIpInput = document.getElementById("ds-ip");
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.className = "status " + (isError ? "err" : "ok");
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+    }
+
+    function renderQrServer(container, text) {
+      const img = document.createElement("img");
+      img.alt = "QR Code";
+      img.src = "/api/qr?text=" + encodeURIComponent(text);
+      container.appendChild(img);
+    }
+
+    function renderQr(container, text) {
+      container.innerHTML = "";
+      if (!text) return;
+
+      if (typeof QRCode !== "undefined") {
+        try {
+          new QRCode(container, {
+            text: text,
+            width: 220,
+            height: 220,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
+          });
+          return;
+        } catch (err) {
+          console.warn("QRCode.js failed, using server fallback:", err);
+        }
+      }
+
+      renderQrServer(container, text);
+    }
+
+    function createFileCard(file, index) {
+      const card = document.createElement("section");
+      card.className = "card file-card";
+      card.innerHTML = `
+        <div class="qr-wrap" id="qr-file-${index}"></div>
+        <h2>${file.name}</h2>
+        <div class="file-meta">${formatSize(file.size)}</div>
+        <div><strong>FBI URL</strong></div>
+        <div class="url">${file.fbi_url}</div>
+      `;
+      return card;
+    }
+
+    async function refreshInfo() {
+      const res = await fetch("/api/info");
+      const info = await res.json();
+
+      webUiUrlEl.textContent = info.web_ui_url;
+
+      fileListEl.innerHTML = "";
+      if (info.error) {
+        setStatus(info.error, true);
+        return;
+      }
+
+      if (info.files.length === 0) {
+        setStatus("配信ファイルがありません。ビルドしてください。", true);
+        return;
+      }
+
+      info.files.forEach((file, index) => {
+        const card = createFileCard(file, index);
+        fileListEl.appendChild(card);
+        renderQr(document.getElementById(`qr-file-${index}`), file.fbi_url);
+      });
+
+      if (info.last_message) {
+        setStatus(info.last_message, info.last_error);
+      } else {
+        setStatus(`配信中: ${info.files.length} ファイル (port ${info.file_port})`);
+      }
+    }
+
+    async function sendToFbi() {
+      const dsIp = dsIpInput.value.trim();
+      if (!dsIp) {
+        setStatus("3DS IP を入力してください。", true);
+        return;
+      }
+      setStatus("送信中...");
+      document.getElementById("btn-send").disabled = true;
+      try {
+        const res = await fetch("/api/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ds_ip: dsIp })
+        });
+        const data = await res.json();
+        setStatus(data.message || (data.ok ? "送信完了" : "送信失敗"), !data.ok);
+        if (data.ok) await refreshInfo();
+      } catch (err) {
+        setStatus(String(err), true);
+      } finally {
+        document.getElementById("btn-send").disabled = false;
+      }
+    }
+
+    async function runBuild() {
+      setStatus("ビルド中...");
+      document.getElementById("btn-build").disabled = true;
+      try {
+        const res = await fetch("/api/build", { method: "POST" });
+        const data = await res.json();
+        if (!data.ok) {
+          setStatus(data.message || "ビルド失敗", true);
+          return;
+        }
+        setStatus("ビルド完了");
+        await refreshInfo();
+      } catch (err) {
+        setStatus(String(err), true);
+      } finally {
+        document.getElementById("btn-build").disabled = false;
+      }
+    }
+
+    document.getElementById("btn-send").addEventListener("click", sendToFbi);
+    document.getElementById("btn-build").addEventListener("click", runBuild);
+    document.getElementById("btn-refresh").addEventListener("click", refreshInfo);
+
+    refreshInfo().catch(err => setStatus(String(err), true));
+  </script>
+</body>
+</html>

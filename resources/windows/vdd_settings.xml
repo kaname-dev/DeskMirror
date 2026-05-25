@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- Virtual Display Driver settings for DeskMirror / 3DS (400x240 top screen)
+     VDD minimum resolution is 640x480 — 400x240 cannot be listed in Windows.
+     800x480 matches 3DS aspect ratio (5:3); pc-cast scales to 400x240. -->
+<vdd_settings>
+    <monitors>
+        <count>1</count>
+    </monitors>
+    <gpu>
+        <friendlyname>default</friendlyname>
+    </gpu>
+    <global>
+        <g_refresh_rate>60</g_refresh_rate>
+    </global>
+    <resolutions>
+        <resolution>
+            <width>800</width>
+            <height>480</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+        <resolution>
+            <width>640</width>
+            <height>480</height>
+            <refresh_rate>60</refresh_rate>
+        </resolution>
+    </resolutions>
+    <options>
+        <CustomEdid>false</CustomEdid>
+        <PreventSpoof>false</PreventSpoof>
+        <EdidCeaOverride>false</EdidCeaOverride>
+        <HardwareCursor>false</HardwareCursor>
+        <SDR10bit>false</SDR10bit>
+        <HDRPlus>false</HDRPlus>
+        <logging>false</logging>
+        <debuglogging>false</debuglogging>
+    </options>
+</vdd_settings>
